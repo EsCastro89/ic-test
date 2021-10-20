@@ -5,6 +5,10 @@ pipeline {
      triggers {
         pollSCM('* * * * *')
     }
+	
+	environment {
+		PROJETC_PATH_BACK = 'ejemplo-rest'
+	}
 
     stages {
 
@@ -26,31 +30,41 @@ pipeline {
             }
         }
 
-        stage('Install') {
-            steps {
-                sh 'npm install'
-            }
-        }
-
-        stage('Tests') {
-            steps {
-                sh 'npm run test'
-            }
-        }
-
-
-        stage('Sonar Scanner Coverage') {
+        stage('Compile'){
+			parallel {
+				stage('Compile backend'){
+					steps{
+						echo "------------>Compilación backend<------------"
+						dir("${PROJETC_PATH_BACK}"){
+							sh 'chmod +x gradlew'
+							sh './gradlew clean build -x test'
+						}
+					}
+				
+				}
+			}
+		}
+		
+		stage('Test Unitarios -Cobertura'){
+			parallel {
+				stage('Test- Cobertura backend'){
+					steps {
+						echo '------------>test backend<------------'
+						dir("${PROJETC_PATH_BACK}"){
+							sh './gradlew --stacktrace test'
+							
+						}
+					}
+				}
+			}
+		}
+		
+		stage('Sonar Scanner Coverage') {
             steps{
                 echo '------------>Análisis de código estático<------------'
                 withSonarQubeEnv('Sonar') {
                     sh "${tool name: 'SonarScanner', type:'hudson.plugins.sonar.SonarRunnerInstallation'}/bin/sonar-scanner" 
                 }
-            }
-        }
-
-        stage('Build'){
-            steps {
-                sh 'ng build --prod '
             }
         }
     }
@@ -64,7 +78,7 @@ pipeline {
         }
         failure {
             echo 'This will run only if failed'
-            mail (to: 'carlos.pulido@ceiba.com.co', subject: "Failed Pipeline:${currentBuild.fullDisplayName}",body: "Something is wrong with ${env.BUILD_URL}") 
+            mail (to: 'esteban.castro@ceiba.com.co', subject: "Failed Pipeline:${currentBuild.fullDisplayName}",body: "Something is wrong with ${env.BUILD_URL}") 
         }
     }
 }
